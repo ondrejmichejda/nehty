@@ -1,5 +1,6 @@
 "use strict";
 const stickerOptions = ["😀", "😍", "🌟", "🦄", "🍓"];
+const scentOptions = ["🌸", "🍓", "🍋", "🥥", "🍯"];
 const rounds = [
     {
         name: "Zajickova packa",
@@ -27,6 +28,7 @@ const state = {
     mode: "clip",
     selectedPolish: "#ff5fa2",
     selectedSticker: stickerOptions[0],
+    selectedScent: scentOptions[0],
     pointerDown: false,
     clipperX: 0,
     clipperY: 0,
@@ -238,6 +240,24 @@ style.textContent = `
     transform: translate(-50%, -50%) scale(1);
   }
 
+  .nail-scent {
+    position: absolute;
+    left: 50%;
+    top: -12px;
+    transform: translateX(-50%) translateY(10px) scale(0.7);
+    font-size: 26px;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+    pointer-events: none;
+    filter: drop-shadow(0 6px 10px rgba(90, 50, 92, 0.18));
+  }
+
+  .nail-scent.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+
   .nail-tip {
     position: absolute;
     left: 8%;
@@ -331,6 +351,25 @@ style.textContent = `
   .clipper.sticker-mode span {
     right: 12px;
     top: 12px;
+    font-size: 28px;
+  }
+
+  .clipper.scent-mode::before {
+    inset: 14px 26px 26px;
+    border-radius: 20px 20px 26px 26px;
+    background: linear-gradient(180deg, #dff6a8 0%, #8bd17c 100%);
+    transform: none;
+  }
+
+  .clipper.scent-mode::after {
+    inset: 54px 28px 8px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, #ffd2a6 0%, #ff9c6b 100%);
+  }
+
+  .clipper.scent-mode span {
+    right: 14px;
+    top: 10px;
     font-size: 28px;
   }
 
@@ -539,6 +578,7 @@ function setupRound() {
     state.mode = "clip";
     state.selectedPolish = config.colors[0];
     state.selectedSticker = stickerOptions[0];
+    state.selectedScent = scentOptions[0];
     hand.querySelectorAll(".finger").forEach((finger) => finger.remove());
     playArea.style.background = config.bg;
     const fingerOffsets = [8, 25, 42, 59, 76];
@@ -552,8 +592,10 @@ function setupRound() {
             trimmed: false,
             painted: false,
             decorated: false,
+            scented: false,
             polishColor: config.colors[index],
             stickerEmoji: stickerOptions[index % stickerOptions.length],
+            scentEmoji: scentOptions[index % scentOptions.length],
         };
         const finger = document.createElement("div");
         finger.className = "finger";
@@ -567,17 +609,20 @@ function setupRound() {
         polish.className = "nail-polish";
         const decal = document.createElement("div");
         decal.className = "nail-decal";
+        const scent = document.createElement("div");
+        scent.className = "nail-scent";
         const tip = document.createElement("div");
         tip.className = "nail-tip";
         const sparkle = document.createElement("div");
         sparkle.className = "sparkle";
         sparkle.textContent = config.sticker;
-        nailEl.append(polish, decal, tip, sparkle);
+        nailEl.append(polish, decal, scent, tip, sparkle);
         finger.append(nailEl);
         hand.append(finger);
         nail.element = nailEl;
         nail.polish = polish;
         nail.decal = decal;
+        nail.scent = scent;
         nail.tip = tip;
         nail.sparkle = sparkle;
         state.nails.push(nail);
@@ -598,12 +643,18 @@ function lighten(hex) {
 }
 function updateHud() {
     roundTitle.textContent = `${rounds[state.roundIndex].sticker} ${rounds[state.roundIndex].name}`;
-    const modeLabel = state.mode === "clip" ? "Strihani" : state.mode === "paint" ? "Lakovani" : "Smajliky";
+    const modeLabel = state.mode === "clip"
+        ? "Strihani"
+        : state.mode === "paint"
+            ? "Lakovani"
+            : state.mode === "sticker"
+                ? "Smajliky"
+                : "Vune";
     scoreLabel.textContent = `Hvezdicky: ${state.score} • ${modeLabel}`;
 }
 function renderNails() {
     state.nails.forEach((nail) => {
-        if (!nail.element || !nail.tip || !nail.sparkle || !nail.polish || !nail.decal) {
+        if (!nail.element || !nail.tip || !nail.sparkle || !nail.polish || !nail.decal || !nail.scent) {
             return;
         }
         nail.element.style.height = `${nail.length}px`;
@@ -612,13 +663,40 @@ function renderNails() {
         nail.polish.style.background = `linear-gradient(180deg, ${nail.polishColor} 0%, ${lighten(nail.polishColor)} 100%)`;
         nail.decal.textContent = nail.stickerEmoji;
         nail.decal.classList.toggle("show", nail.decorated);
+        nail.scent.textContent = nail.scentEmoji;
+        nail.scent.classList.toggle("show", nail.scented);
         nail.element.classList.toggle("trimmed", nail.trimmed);
         nail.element.classList.toggle("painted", nail.painted);
-        nail.sparkle.classList.toggle("show", state.mode === "clip" ? nail.trimmed : state.mode === "paint" ? nail.painted : nail.decorated);
+        nail.sparkle.classList.toggle("show", state.mode === "clip"
+            ? nail.trimmed
+            : state.mode === "paint"
+                ? nail.painted
+                : state.mode === "sticker"
+                    ? nail.decorated
+                    : nail.scented);
     });
 }
 function renderPalette() {
     palette.innerHTML = "";
+    if (state.mode === "scent") {
+        scentOptions.forEach((emoji) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "swatch";
+            button.textContent = emoji;
+            button.style.fontSize = "22px";
+            button.style.display = "grid";
+            button.style.placeItems = "center";
+            button.style.background = "linear-gradient(180deg, #ffffff 0%, #eefad8 100%)";
+            button.classList.toggle("active", emoji === state.selectedScent);
+            button.addEventListener("click", () => {
+                state.selectedScent = emoji;
+                renderPalette();
+            });
+            palette.append(button);
+        });
+        return;
+    }
     if (state.mode === "sticker") {
         stickerOptions.forEach((emoji) => {
             const button = document.createElement("button");
@@ -655,7 +733,9 @@ function renderPalette() {
 function syncToolMode() {
     clipper.classList.toggle("paint-mode", state.mode === "paint");
     clipper.classList.toggle("sticker-mode", state.mode === "sticker");
-    clipper.querySelector("span").textContent = state.mode === "paint" ? "🖌️" : state.mode === "sticker" ? "😊" : "✂️";
+    clipper.classList.toggle("scent-mode", state.mode === "scent");
+    clipper.querySelector("span").textContent =
+        state.mode === "paint" ? "🖌️" : state.mode === "sticker" ? "😊" : state.mode === "scent" ? "✨" : "✂️";
     palette.classList.toggle("show", state.mode !== "clip");
     renderPalette();
     updateHud();
@@ -802,6 +882,49 @@ function decorateAtPointer() {
         checkRoundDone();
     }
 }
+function scentAtPointer() {
+    if (!state.pointerDown || state.mode !== "scent") {
+        return;
+    }
+    const playRect = playArea.getBoundingClientRect();
+    const scentTipX = playRect.left + state.clipperX;
+    const scentTipY = playRect.top + state.clipperY - 8;
+    let scentedAny = false;
+    let targetNail;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    state.nails.forEach((nail) => {
+        if (!nail.element || !nail.trimmed || !nail.painted || !nail.decorated) {
+            return;
+        }
+        const rect = nail.element.getBoundingClientRect();
+        const hitX = scentTipX >= rect.left - 12 && scentTipX <= rect.right + 12;
+        const hitY = scentTipY >= rect.top - 24 && scentTipY <= rect.bottom + 10;
+        if (!hitX || !hitY) {
+            return;
+        }
+        const nailCenterX = rect.left + rect.width * 0.5;
+        const nailCenterY = rect.top + rect.height * 0.3;
+        const distance = Math.hypot(scentTipX - nailCenterX, scentTipY - nailCenterY);
+        if (distance < bestDistance) {
+            bestDistance = distance;
+            targetNail = nail;
+        }
+    });
+    if (targetNail && (!targetNail.scented || targetNail.scentEmoji !== state.selectedScent)) {
+        const firstScent = !targetNail.scented;
+        targetNail.scented = true;
+        targetNail.scentEmoji = state.selectedScent;
+        scentedAny = true;
+        if (firstScent) {
+            state.score += 2;
+        }
+    }
+    if (scentedAny) {
+        helperText.textContent = "Mnam! Navon i zbytek nehtiku.";
+        renderNails();
+        checkRoundDone();
+    }
+}
 function checkRoundDone() {
     if (state.mode === "clip" && state.nails.every((nail) => nail.trimmed)) {
         state.mode = "paint";
@@ -817,11 +940,18 @@ function checkRoundDone() {
         renderNails();
         return;
     }
-    if (!state.nails.every((nail) => nail.trimmed && nail.painted && nail.decorated)) {
+    if (state.mode === "sticker" && state.nails.every((nail) => nail.trimmed && nail.painted && nail.decorated)) {
+        state.mode = "scent";
+        helperText.textContent = "Ted vyber vuni a navon vsechny nehtiky.";
+        syncToolMode();
+        renderNails();
+        return;
+    }
+    if (!state.nails.every((nail) => nail.trimmed && nail.painted && nail.decorated && nail.scented)) {
         return;
     }
     if (state.roundIndex < rounds.length - 1) {
-        showMessage("Hotovo!", "Vsechny nehtiky jsou ostrihane, nalakovane i ozdobene. Muze prijit dalsi rucicka.", "Dalsi rucka");
+        showMessage("Hotovo!", "Vsechny nehtiky jsou ostrihane, nalakovane, ozdobene i nadherne navonene. Muze prijit dalsi rucicka.", "Dalsi rucka");
         return;
     }
     showMessage("Ty jo!", `Zvladla jsi vsechny ruce a nasbirala ${state.score} hvezdicek!`, "Hrat znovu");
@@ -836,6 +966,7 @@ function updateClipperPosition(clientX, clientY) {
     cutAtPointer();
     paintAtPointer();
     decorateAtPointer();
+    scentAtPointer();
 }
 playArea.addEventListener("pointerdown", (event) => {
     if (messageCard.classList.contains("show")) {
@@ -855,10 +986,10 @@ playArea.addEventListener("pointerleave", () => {
 });
 nextButton.addEventListener("click", () => {
     hideMessage();
-    if (state.roundIndex < rounds.length - 1 && state.nails.every((nail) => nail.trimmed && nail.painted && nail.decorated)) {
+    if (state.roundIndex < rounds.length - 1 && state.nails.every((nail) => nail.trimmed && nail.painted && nail.decorated && nail.scented)) {
         state.roundIndex += 1;
     }
-    else if (state.roundIndex === rounds.length - 1 && state.nails.every((nail) => nail.trimmed && nail.painted && nail.decorated)) {
+    else if (state.roundIndex === rounds.length - 1 && state.nails.every((nail) => nail.trimmed && nail.painted && nail.decorated && nail.scented)) {
         state.roundIndex = 0;
         state.score = 0;
         state.cuts = 0;
