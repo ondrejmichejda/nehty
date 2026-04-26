@@ -188,7 +188,7 @@ style.textContent = `
 
   .finger {
     position: absolute;
-    bottom: 40%;
+    bottom: 28%;
     width: 14%;
     background: linear-gradient(180deg, #ffd9ba 0%, #ffc2a2 100%);
     border-radius: 999px 999px 28px 28px;
@@ -422,6 +422,7 @@ style.textContent = `
 
     .finger {
       width: 16%;
+      bottom: 30%;
     }
 
     .clipper {
@@ -482,6 +483,7 @@ style.textContent = `
 
     .finger {
       width: 17%;
+      bottom: 31%;
     }
   }
 `;
@@ -661,6 +663,8 @@ function cutAtPointer(): void {
   const clipperTipY = playRect.top + state.clipperY - 6;
 
   let trimmed = false;
+  let targetNail: NailState | undefined;
+  let bestDistance = Number.POSITIVE_INFINITY;
 
   state.nails.forEach((nail) => {
     if (!nail.element || nail.trimmed) {
@@ -673,19 +677,32 @@ function cutAtPointer(): void {
     const hitY = clipperTipY >= tipTop - 16 && clipperTipY <= rect.bottom + 18;
     const insideHand = clipperTipY >= handRect.top - 30 && clipperTipY <= handRect.bottom;
 
-    if (hitX && hitY && insideHand) {
-      nail.length = Math.max(nail.target, nail.length - 5);
-      state.cuts += 1;
-      trimmed = true;
+    if (!hitX || !hitY || !insideHand) {
+      return;
+    }
 
-      if (nail.length <= nail.target) {
-        nail.trimmed = true;
-        state.score += 3;
-        helperText.textContent = "Krasne! Pokracuj na dalsi nehtik.";
-        updateHud();
-      }
+    const nailCenterX = rect.left + rect.width * 0.5;
+    const nailTipY = rect.bottom - 14;
+    const distance = Math.hypot(clipperTipX - nailCenterX, clipperTipY - nailTipY);
+
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      targetNail = nail;
     }
   });
+
+  if (targetNail) {
+    targetNail.length = Math.max(targetNail.target, targetNail.length - 5);
+    state.cuts += 1;
+    trimmed = true;
+
+    if (targetNail.length <= targetNail.target) {
+      targetNail.trimmed = true;
+      state.score += 3;
+      helperText.textContent = "Krasne! Pokracuj na dalsi nehtik.";
+      updateHud();
+    }
+  }
 
   if (trimmed) {
     renderNails();
@@ -702,6 +719,8 @@ function paintAtPointer(): void {
   const brushTipX = playRect.left + state.clipperX;
   const brushTipY = playRect.top + state.clipperY - 12;
   let paintedAny = false;
+  let targetNail: NailState | undefined;
+  let bestDistance = Number.POSITIVE_INFINITY;
 
   state.nails.forEach((nail) => {
     if (!nail.element || !nail.trimmed) {
@@ -712,17 +731,30 @@ function paintAtPointer(): void {
     const hitX = brushTipX >= rect.left - 10 && brushTipX <= rect.right + 10;
     const hitY = brushTipY >= rect.top - 12 && brushTipY <= rect.bottom + 12;
 
-    if (hitX && hitY && (!nail.painted || nail.polishColor !== state.selectedPolish)) {
-      const firstPaint = !nail.painted;
-      nail.painted = true;
-      nail.polishColor = state.selectedPolish;
-      paintedAny = true;
+    if (!hitX || !hitY) {
+      return;
+    }
 
-      if (firstPaint) {
-        state.score += 2;
-      }
+    const nailCenterX = rect.left + rect.width * 0.5;
+    const nailCenterY = rect.top + rect.height * 0.5;
+    const distance = Math.hypot(brushTipX - nailCenterX, brushTipY - nailCenterY);
+
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      targetNail = nail;
     }
   });
+
+  if (targetNail && (!targetNail.painted || targetNail.polishColor !== state.selectedPolish)) {
+    const firstPaint = !targetNail.painted;
+    targetNail.painted = true;
+    targetNail.polishColor = state.selectedPolish;
+    paintedAny = true;
+
+    if (firstPaint) {
+      state.score += 2;
+    }
+  }
 
   if (paintedAny) {
     helperText.textContent = "Nadhera! Dolakuj i zbytek nehtiku.";
